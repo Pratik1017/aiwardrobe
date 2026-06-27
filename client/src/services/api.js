@@ -1,11 +1,12 @@
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const isProd = process.env.NODE_ENV === 'production';
+const API_URL = process.env.REACT_APP_API_URL || (isProd ? '/api' : 'http://localhost:5000/api');
 
 // Base URL for serving static files (images)
 export const BASE_URL = process.env.REACT_APP_API_URL
   ? process.env.REACT_APP_API_URL.replace('/api', '')
-  : 'http://localhost:5000';
+  : (isProd ? '' : 'http://localhost:5000');
 
 // Create axios instance
 const api = axios.create({
@@ -92,7 +93,13 @@ export const adminAPI = {
   getStats: () => api.get('/admin/stats'),
   getUsers: () => api.get('/admin/users'),
   getDonations: () => api.get('/admin/donations'),
-  deleteUser: (id) => api.delete(`/admin/users/${id}`)
+  deleteUser: (id) => api.delete(`/admin/users/${id}`),
+  updateUserRole: (id, role) => api.put(`/admin/users/${id}/role`, { role }),
+  getUserWardrobe: (id) => api.get(`/admin/users/${id}/wardrobe`),
+  getAllClothing: (params) => api.get('/admin/clothing', { params }),
+  deleteClothing: (id) => api.delete(`/admin/clothing/${id}`),
+  getAnalytics: () => api.get('/admin/analytics'),
+  getSystemInfo: () => api.get('/admin/system')
 };
 
 export default api;

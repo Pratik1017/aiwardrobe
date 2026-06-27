@@ -49,14 +49,18 @@ exports.getRecommendation = async (req, res) => {
       weather = await weatherService.getWeatherByCity(city || 'Mumbai');
     }
 
-    // 3. Generate Recommendation
+    // 3. Generate Recommendation (pass current IST hour for time-of-day awareness)
+    const nowIST = new Date(new Date().getTime() + (330 + new Date().getTimezoneOffset()) * 60000);
+    const currentHour = nowIST.getHours();
+
     const recommendation = await recommendationService.recommendOutfit(
       wardrobe, 
       weather, 
       finalOccasion, 
       user.preferences,
       recentHistory,
-      user.gender
+      user.gender,
+      currentHour
     );
 
     if (recommendation.error && !recommendation.shoppingSuggestions) {
@@ -99,18 +103,35 @@ exports.getWeather = async (req, res) => {
   }
 };
 
-// Hardcoded India-specific festivals and occasions (Approximate 2026/2027 dates)
+// India-specific festivals and occasions (2026 dates)
 const FESTIVALS = {
   '01-14': { name: 'Makar Sankranti / Pongal', type: 'festival' },
   '01-26': { name: 'Republic Day', type: 'festival' },
-  '02-14': { name: 'Valentine\'s Day', type: 'casual' },
-  '03-03': { name: 'Holi', type: 'festival' }, 
+  '02-14': { name: 'Valentine\'s Day', type: 'romantic' },
+  '03-03': { name: 'Holi', type: 'festival' },
+  '03-17': { name: 'Holika Dahan', type: 'festival' },
+  '03-30': { name: 'Ugadi / Gudi Padwa', type: 'festival' },
+  '04-06': { name: 'Ram Navami', type: 'festival' },
+  '04-10': { name: 'Mahavir Jayanti', type: 'festival' },
+  '04-14': { name: 'Ambedkar Jayanti', type: 'formal' },
+  '04-18': { name: 'Good Friday', type: 'formal' },
+  '05-01': { name: 'May Day', type: 'casual' },
+  '05-12': { name: 'Buddha Purnima', type: 'festival' },
+  '06-27': { name: 'Eid al-Adha', type: 'festival' },
+  '07-06': { name: 'Rath Yatra', type: 'festival' },
   '08-15': { name: 'Independence Day', type: 'festival' },
-  '08-28': { name: 'Raksha Bandhan', type: 'festival' }, 
+  '08-19': { name: 'Raksha Bandhan', type: 'festival' },
+  '08-27': { name: 'Janmashtami', type: 'festival' },
   '09-05': { name: 'Teacher\'s Day', type: 'formal' },
-  '10-18': { name: 'Navratri', type: 'festival' }, 
-  '10-19': { name: 'Dussehra', type: 'festival' }, 
-  '11-08': { name: 'Diwali', type: 'festival' }, 
+  '09-07': { name: 'Ganesh Chaturthi', type: 'festival' },
+  '10-02': { name: 'Gandhi Jayanti', type: 'formal' },
+  '10-12': { name: 'Navratri Begins', type: 'festival' },
+  '10-21': { name: 'Dussehra / Vijayadashami', type: 'festival' },
+  '10-29': { name: 'Karwa Chauth', type: 'romantic' },
+  '11-01': { name: 'Dhanteras', type: 'festival' },
+  '11-02': { name: 'Diwali', type: 'festival' },
+  '11-04': { name: 'Bhai Dooj', type: 'festival' },
+  '11-15': { name: 'Guru Nanak Jayanti', type: 'festival' },
   '12-25': { name: 'Christmas', type: 'festival' },
   '12-31': { name: 'New Year\'s Eve', type: 'casual' }
 };

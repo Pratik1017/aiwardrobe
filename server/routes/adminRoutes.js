@@ -1,22 +1,32 @@
 const express = require('express');
-const { getDashboardStats, getAllUsers, deleteUser, getAllDonations } = require('../controllers/adminController');
+const {
+  getDashboardStats, getAllUsers, deleteUser, updateUserRole,
+  getUserWardrobe, getAllClothing, deleteClothingItem,
+  getAllDonations, getAnalytics, getSystemInfo
+} = require('../controllers/adminController');
 const { authMiddleware, isAdmin } = require('../middleware/auth');
 
 const router = express.Router();
 
-// All routes in this file require authentication and admin role
+// All routes require authentication + admin role
 router.use(authMiddleware, isAdmin);
 
-// Get platform statistics
+// Dashboard & Analytics
 router.get('/stats', getDashboardStats);
+router.get('/analytics', getAnalytics);
+router.get('/system', getSystemInfo);
 
-// Get all users
+// User Management
 router.get('/users', getAllUsers);
-
-// Get all donations
-router.get('/donations', getAllDonations);
-
-// Delete a user and their data
+router.put('/users/:id/role', updateUserRole);
+router.get('/users/:id/wardrobe', getUserWardrobe);
 router.delete('/users/:id', deleteUser);
+
+// Clothing Management
+router.get('/clothing', getAllClothing);
+router.delete('/clothing/:id', deleteClothingItem);
+
+// Donations
+router.get('/donations', getAllDonations);
 
 module.exports = router;

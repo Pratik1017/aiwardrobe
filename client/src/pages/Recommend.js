@@ -234,10 +234,30 @@ const Recommend = () => {
 
       {recommendation && !loading && (
         <div className="bg-primary-50 rounded-3xl shadow-card p-6 md:p-8 border border-primary-100 animate-fade-in">
-          <div className="flex items-center justify-center gap-3 mb-6">
+          <div className="flex items-center justify-center gap-3 mb-2">
             <FiCheckCircle size={24} className="text-green-500" />
             <h2 className="font-heading text-xl font-bold text-dark">Your Perfect Outfit</h2>
+            {recommendation.confidencePercent && (
+              <span className="ml-2 px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700 border border-green-200">
+                {recommendation.confidencePercent}% Match
+              </span>
+            )}
           </div>
+
+          {/* Time-of-day context */}
+          {recommendation.timeContext && (
+            <p className="text-center text-xs text-gray-400 mb-4">
+              {recommendation.timeContext.emoji} {recommendation.timeContext.tip}
+            </p>
+          )}
+
+          {/* Weather tip */}
+          {recommendation.weatherTip && (
+            <div className="mb-6 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 flex items-center gap-3">
+              <span className="text-lg flex-shrink-0">{recommendation.weatherTip.icon}</span>
+              <p className="text-xs text-blue-700 font-medium">{recommendation.weatherTip.text}</p>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-8">
             {recommendation.type === 'two-piece' ? (
@@ -265,6 +285,11 @@ const Recommend = () => {
           <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-5 border border-white/60">
             <h4 className="font-heading font-bold text-dark mb-2 flex items-center gap-2 text-sm">
               <FiStar size={16} className="text-primary" /> AI Reasoning
+              {recommendation.seasonContext && (
+                <span className="ml-auto px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700 border border-amber-200 uppercase">
+                  {recommendation.seasonContext} season
+                </span>
+              )}
             </h4>
             <p className="text-sm text-gray-600 leading-relaxed">{recommendation.reasonText || recommendation.reason || "Selected based on your available wardrobe."}</p>
             {autoDetectInfo && (

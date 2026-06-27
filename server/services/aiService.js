@@ -4,92 +4,49 @@ const { HfInference } = require('@huggingface/inference');
 
 const HF_API_KEY = process.env.HUGGINGFACE_API_KEY;
 const hf = HF_API_KEY ? new HfInference(HF_API_KEY) : null;
-const HF_API_URL = 'https://router.huggingface.co/hf-inference/models/google/vit-base-patch16-224';
+
+// ViT ImageNet classifier with Weighted Voting post-processing
+const VIT_API_URL = 'https://router.huggingface.co/hf-inference/models/google/vit-base-patch16-224';
 
 if (!HF_API_KEY) {
   console.warn('⚠️  HUGGINGFACE_API_KEY is not set in .env');
 }
 
-// Comprehensive ImageNet label → clothing type mapping
-// vit-base-patch16-224 uses ImageNet-1K labels — these are ALL the clothing-related ones
+// Fallback: ImageNet label → clothing type mapping
 const labelToType = {
-  // Direct clothing labels in ImageNet
-  'jersey': 't-shirt',
-  't-shirt': 't-shirt',
-  'suit': 'jacket',
-  'jean': 'pants',
-  'bow tie': 'accessories',
-  'brassiere': 'shirt',
-  'swimsuit': 'dress',
-  'bikini': 'dress',
-  'miniskirt': 'skirt',
-  'overskirt': 'skirt',
-  'hoopskirt': 'skirt',
-  'sarong': 'skirt',
-  'cardigan': 'sweater',
-  'fur coat': 'jacket',
-  'trench coat': 'jacket',
-  'lab coat': 'jacket',
-  'cloak': 'jacket',
-  'poncho': 'jacket',
-  'military uniform': 'jacket',
-  'abaya': 'kurta',
-  'academic gown': 'kurta',
-  'stole': 'accessories',
-  'feather boa': 'accessories',
-  'pajama': 'kurta',
-  'running shoe': 'shoes',
-  'Loafer': 'shoes',
-  'sandal': 'shoes',
-  'clog': 'shoes',
-  'cowboy boot': 'shoes',
-  'boot': 'shoes',
-  'sombrero': 'cap',
-  'cowboy hat': 'cap',
-  'bonnet': 'cap',
-  'mortarboard': 'cap',
-  'shower cap': 'cap',
-  'bathing cap': 'cap',
-  'football helmet': 'cap',
-  'crash helmet': 'cap',
-  'sunglasses': 'sunglasses',
-  'sunglass': 'sunglasses',
-  'neck brace': 'accessories',
-  'necklace': 'accessories',
-  'bib': 'accessories',
-  'maillot': 'shirt',
-  'tank suit': 'shirt',
-  'sweatshirt': 'sweater',
-  'hosiery': 'pants',
-  'sock': 'accessories',
-  'handkerchief': 'accessories',
-  'diaper': 'other',
-  'apron': 'other',
-  'vestment': 'kurta',
-  'kimono': 'kurta',
-  'digital watch': 'watch',
-  'stopwatch': 'watch',
-  'magnetic compass': 'watch',
-  'buckle': 'belt',
+  'jersey': 't-shirt', 't-shirt': 't-shirt', 'tee shirt': 't-shirt',
+  'suit': 'jacket', 'jean': 'pants', 'blue jean': 'pants', 'denim': 'pants',
+  'bow tie': 'accessories', 'miniskirt': 'skirt', 'overskirt': 'skirt',
+  'cardigan': 'sweater', 'fur coat': 'jacket', 'trench coat': 'jacket',
+  'lab coat': 'jacket', 'cloak': 'jacket', 'poncho': 'jacket',
+  'abaya': 'kurta', 'running shoe': 'shoes', 'loafer': 'shoes',
+  'sandal': 'shoes', 'cowboy boot': 'shoes', 'boot': 'shoes',
+  'sombrero': 'cap', 'cowboy hat': 'cap', 'bonnet': 'cap',
+  'sunglasses': 'sunglasses', 'sunglass': 'sunglasses',
+  'sweatshirt': 'sweater', 'maillot': 'shirt',
+  'digital watch': 'watch', 'stopwatch': 'watch',
+  'buckle': 'belt', 'kimono': 'kurta',
+  'wool': 'sweater', 'woolen': 'sweater',
+  'windsor tie': 'accessories', 'bolo tie': 'accessories',
 };
 
-// Keyword-based fallback detection (partial match)
+// Keyword → type mapping (for partial matching)
 const keywordToType = [
-  { keywords: ['t-shirt', 'tshirt', 'tee'], type: 't-shirt' },
-  { keywords: ['shirt', 'polo', 'blouse', 'jersey', 'maillot', 'tank'], type: 'shirt' },
-  { keywords: ['pant', 'jean', 'trouser', 'shorts', 'legging', 'hosiery'], type: 'pants' },
-  { keywords: ['dress', 'gown', 'swimsuit', 'bikini'], type: 'dress' },
+  { keywords: ['t-shirt', 'tshirt', 'tee shirt', 'tee'], type: 't-shirt' },
+  { keywords: ['polo', 'blouse', 'maillot', 'tank'], type: 'shirt' },
+  { keywords: ['pant', 'jean', 'trouser', 'shorts', 'legging', 'denim'], type: 'pants' },
+  { keywords: ['dress', 'gown', 'swimsuit'], type: 'dress' },
   { keywords: ['skirt', 'sarong'], type: 'skirt' },
-  { keywords: ['jacket', 'coat', 'blazer', 'suit', 'cloak', 'poncho', 'uniform', 'parka', 'windbreaker', 'leather', 'denim jacket', 'cardigan', 'shacket', 'bomber'], type: 'jacket' },
-  { keywords: ['sweater', 'sweatshirt', 'hoodie', 'pullover', 'fleece', 'jumper'], type: 'sweater' },
-  { keywords: ['shoe', 'boot', 'sneaker', 'loafer', 'sandal', 'clog', 'slipper', 'heel'], type: 'shoes' },
-  { keywords: ['watch', 'wristwatch', 'clock'], type: 'watch' },
+  { keywords: ['jacket', 'coat', 'blazer', 'suit', 'cloak', 'poncho', 'bomber', 'parka'], type: 'jacket' },
+  { keywords: ['sweater', 'sweatshirt', 'hoodie', 'pullover', 'fleece', 'jumper', 'cardigan'], type: 'sweater' },
+  { keywords: ['shoe', 'boot', 'sneaker', 'loafer', 'sandal', 'slipper'], type: 'shoes' },
+  { keywords: ['watch', 'wristwatch'], type: 'watch' },
   { keywords: ['belt', 'buckle'], type: 'belt' },
-  { keywords: ['sunglasses', 'sunglass', 'glasses'], type: 'sunglasses' },
-  { keywords: ['hat', 'cap', 'bonnet', 'helmet', 'sombrero', 'beret', 'turban'], type: 'cap' },
-  { keywords: ['bag', 'purse', 'wallet', 'backpack', 'handbag', 'clutch'], type: 'accessories' },
-  { keywords: ['tie', 'bow', 'scarf', 'necklace', 'brace', 'sock', 'glove'], type: 'accessories' },
-  { keywords: ['kurta', 'salwar', 'sherwani', 'dhoti', 'lungi', 'tunic', 'robe', 'abaya', 'vestment', 'kimono', 'pajama', 'kameez', 'churidar'], type: 'kurta' },
+  { keywords: ['sunglasses', 'glasses'], type: 'sunglasses' },
+  { keywords: ['hat', 'cap', 'bonnet', 'helmet', 'beret'], type: 'cap' },
+  { keywords: ['bag', 'purse', 'wallet', 'backpack'], type: 'accessories' },
+  { keywords: ['tie', 'bow', 'scarf', 'necklace', 'glove'], type: 'accessories' },
+  { keywords: ['kurta', 'salwar', 'sherwani', 'tunic', 'robe', 'abaya', 'kameez'], type: 'kurta' },
 ];
 
 // Category inference from type
@@ -102,46 +59,111 @@ const typeToCategory = {
 };
 
 /**
- * Classify clothing from HF labels
+ * Map a single label to a clothing type using exact + keyword matching
  */
-function classifyFromLabels(results) {
+function mapLabelToType(label) {
+  const lowerLabel = label.toLowerCase().trim();
+
+  // Check each sub-label (ImageNet returns "jersey, T-shirt, tee shirt")
+  const parts = lowerLabel.split(',').map(p => p.trim());
+  for (const part of parts) {
+    if (labelToType[part]) return labelToType[part];
+  }
+
+  // Keyword partial match
+  for (const { keywords, type } of keywordToType) {
+    if (keywords.some(kw => lowerLabel.includes(kw))) return type;
+  }
+
+  return null; // Not a clothing item
+}
+
+/**
+ * WEIGHTED VOTING CLASSIFIER
+ * Instead of picking the first match, this aggregates confidence scores
+ * across ALL top results and groups them by clothing type.
+ *
+ * Example: If ViT returns:
+ *   - sweatshirt (12.5%)    → sweater: 12.5%
+ *   - jersey/T-shirt (6.4%) → t-shirt: 6.4%
+ *   - cardigan (6.8%)       → sweater: 6.8% + 12.5% = 19.3%
+ *   - wool (5.6%)           → sweater: 5.6% + 19.3% = 24.9%
+ *
+ * Sweater wins with 24.9% aggregated vs t-shirt's 6.4%.
+ * But for a real shirt image, shirt-related labels would collectively
+ * outweigh any single sweater label.
+ */
+function classifyWithVoting(results) {
   if (!results || results.length === 0) return { type: 'other', confidence: 0, labels: [] };
 
-  // 1. Try exact label match first
-  for (const result of results) {
-    const label = result.label.toLowerCase().trim();
-    // Check each part of multi-word labels like "jean, blue jean, denim"
-    const parts = label.split(',').map(p => p.trim());
-    for (const part of parts) {
-      if (labelToType[part]) {
-        return {
-          type: labelToType[part],
-          confidence: result.score,
-          labels: results.slice(0, 5).map(r => r.label)
-        };
-      }
-    }
-  }
+  const typeScores = {};   // { 'shirt': 0.35, 'sweater': 0.12, ... }
+  const typeReasons = {};  // { 'shirt': ['jersey (12%)', ...], ... }
 
-  // 2. Try keyword matching across all results
+  // Scan top 10 results and aggregate scores by type
   for (const result of results.slice(0, 10)) {
-    const label = result.label.toLowerCase();
-    for (const { keywords, type } of keywordToType) {
-      if (keywords.some(kw => label.includes(kw))) {
-        return {
-          type,
-          confidence: result.score,
-          labels: results.slice(0, 5).map(r => r.label)
-        };
-      }
+    const mappedType = mapLabelToType(result.label);
+    if (mappedType) {
+      typeScores[mappedType] = (typeScores[mappedType] || 0) + result.score;
+      if (!typeReasons[mappedType]) typeReasons[mappedType] = [];
+      typeReasons[mappedType].push(`${result.label.split(',')[0].trim()} (${(result.score*100).toFixed(1)}%)`);
     }
   }
 
-  // 3. No clothing detected
+  if (Object.keys(typeScores).length === 0) {
+    return { type: 'other', confidence: results[0]?.score || 0, labels: results.slice(0, 5).map(r => r.label) };
+  }
+
+  // Sort types by aggregated score
+  const sortedTypes = Object.entries(typeScores).sort((a, b) => b[1] - a[1]);
+  const bestType = sortedTypes[0][0];
+  const bestScore = sortedTypes[0][1];
+
+  console.log('📊 Voting results:');
+  sortedTypes.forEach(([type, score]) => {
+    console.log(`   ${type}: ${(score*100).toFixed(1)}% (from: ${typeReasons[type].join(', ')})`);
+  });
+
   return {
-    type: 'other',
-    confidence: results[0]?.score || 0,
+    type: bestType,
+    confidence: bestScore,
     labels: results.slice(0, 5).map(r => r.label)
+  };
+}
+
+/**
+ * Classify image using ViT + Weighted Voting
+ */
+async function classifyImage(imageBuffer) {
+  console.log('🤖 Classifying with ViT + Weighted Voting...');
+
+  const response = await fetch(VIT_API_URL, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${HF_API_KEY}`,
+      'Content-Type': 'application/octet-stream'
+    },
+    body: imageBuffer
+  });
+
+  if (!response.ok) {
+    const errBody = await response.text();
+    throw new Error(`ViT API ${response.status}: ${errBody}`);
+  }
+
+  const results = await response.json();
+  console.log('📋 Raw ViT labels:', results.slice(0, 5).map(r => `${r.label} (${(r.score*100).toFixed(1)}%)`).join(', '));
+
+  const classified = classifyWithVoting(results);
+  const category = typeToCategory[classified.type] || 'casual';
+
+  console.log(`✅ Final: ${classified.type} | Category: ${category} | Aggregated Confidence: ${(classified.confidence * 100).toFixed(1)}%`);
+
+  return {
+    type: classified.type,
+    confidence: classified.confidence,
+    category,
+    labels: classified.labels,
+    method: 'vit-voting'
   };
 }
 
@@ -156,6 +178,7 @@ exports.analyzeClothingImage = async (imageBuffer) => {
   let category = 'casual';
   let confidence = 0;
   let detectedLabels = [];
+  let classificationMethod = 'none';
   let errorMsg = null;
 
   try {
@@ -173,45 +196,32 @@ exports.analyzeClothingImage = async (imageBuffer) => {
       console.error('❌ Color error:', colorErr.message);
     }
 
-    // 2. Classify with HuggingFace API (direct fetch — bypasses broken library)
+    // 2. Classify clothing type
     if (!HF_API_KEY) {
       errorMsg = 'HUGGINGFACE_API_KEY not configured';
     } else {
       try {
-        console.log('🤖 Classifying image with ViT...');
-
-        const response = await fetch(HF_API_URL, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${HF_API_KEY}`,
-            'Content-Type': 'application/octet-stream'
-          },
-          body: imageBuffer
-        });
-
-        if (!response.ok) {
-          const errBody = await response.text();
-          throw new Error(`HF API ${response.status}: ${errBody}`);
-        }
-
-        const results = await response.json();
-        console.log('📋 Raw HF results:', results.slice(0, 5).map(r => `${r.label} (${(r.score*100).toFixed(1)}%)`).join(', '));
-
-        const classified = classifyFromLabels(results);
-        detectedType = classified.type;
-        confidence = classified.confidence;
-        detectedLabels = classified.labels;
-        category = typeToCategory[detectedType] || 'casual';
-
-        console.log(`👕 Detected: ${detectedType} | Category: ${category} | Confidence: ${(confidence * 100).toFixed(1)}%`);
-
-      } catch (hfErr) {
-        console.error('❌ HF API Error:', hfErr.message);
-        errorMsg = hfErr.message;
+        const result = await classifyImage(imageBuffer);
+        detectedType = result.type;
+        confidence = result.confidence;
+        category = result.category;
+        detectedLabels = result.labels;
+        classificationMethod = result.method;
+      } catch (classifyErr) {
+        console.error('❌ Classification failed:', classifyErr.message);
+        errorMsg = classifyErr.message;
       }
     }
 
-    return { type: detectedType, color: dominantColor, category, confidence, detectedLabels, ...(errorMsg && { error: errorMsg }) };
+    return {
+      type: detectedType,
+      color: dominantColor,
+      category,
+      confidence,
+      detectedLabels,
+      classificationMethod,
+      ...(errorMsg && { error: errorMsg })
+    };
   } catch (error) {
     console.error('❌ General Error:', error);
     return { type: 'other', color: 'neutral', category: 'casual', confidence: 0, detectedLabels: [], error: error.message };
