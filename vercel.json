@@ -19,12 +19,16 @@
       "destination": "/server/server.js"
     },
     {
-      "source": "/uploads/(.*)",
-      "destination": "/server/server.js"
+      "source": "/static/(.*)",
+      "destination": "/client/static/$1"
+    },
+    {
+      "source": "/(.*\\.(png|jpg|jpeg|webp|ico|json|txt|map))$",
+      "destination": "/client/$1"
     },
     {
       "source": "/(.*)",
-      "destination": "/client/$1"
+      "destination": "/client/index.html"
     }
   ]
 }
